@@ -541,27 +541,27 @@ public class JDBCManager {
      * @param relacion
      * @param rf
      */
-    private void setValueReflexion(Object instance, String fieldName, Object value, boolean relacion, ReflexionMethodAndField rf) {
+    private void setValueReflexion(Object instance, String fieldName, Object value, boolean relacion) {
         try {
             if (fieldName.toLowerCase().contains("_id") && (fieldName.toLowerCase().lastIndexOf("_id") == (fieldName.length() - 3)) && relacion) {
 //                System.out.println(fieldName.substring(0, fieldName.length() - 3));
-                Field f = rf.getField(fieldName.substring(0, fieldName.length() - 3));
+                Field f = getFieldClass(instance.getClass(), fieldName.substring(0, fieldName.length() - 3));
                 if (f != null) {
                     f.setAccessible(true);
                     Object o = get(f.getType(), value, false);
                     if (o != null) {
 //                        System.out.println(capitalize(fieldName.substring(0, fieldName.length() - 3)));
-                        Method method = (rf.getMethod("set" + capitalize(fieldName.substring(0, fieldName.length() - 3))));
+                        Method method = (getMethodClass1(instance.getClass(), "set" + capitalize(fieldName.substring(0, fieldName.length() - 3))));
                         method.setAccessible(true);
                         method.invoke(instance, get(o.getClass(), value, false));
 
                     }
                 }
-            } else if (value != null && rf.getMethod("set" + capitalize(fieldName)) != null) {
-                Field fila = rf.getField(fieldName);
+            } else if (value != null && getMethodClass1(instance.getClass(), "set" + capitalize(fieldName)) != null) {
+                Field fila = getFieldClass(instance.getClass(), fieldName);
                 if (fila != null) {
                     if (fila.getAnnotation(Column.class) != null || fila.getAnnotation(Id.class) != null) {
-                        Method method = (rf.getMethod("set" + capitalize(fieldName)));
+                        Method method = (getMethodClass1(instance.getClass(), "set" + capitalize(fieldName)));
 
                         if (Collection.class.isAssignableFrom(fila.getType())) {
                             if (value instanceof byte[]) {
@@ -576,7 +576,7 @@ public class JDBCManager {
                             method.invoke(instance, value);
                         }
                     } else if (fila.getAnnotation(OneToMany.class) != null) {
-                        Method method = rf.getMethod("set" + capitalize(fieldName));
+                        Method method = getMethodClass1(instance.getClass(), "set" + capitalize(fieldName));
                         method.invoke(instance, value);
 
                     }
@@ -585,7 +585,7 @@ public class JDBCManager {
             }
         } catch (SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
             if (fieldName.equalsIgnoreCase("id") && !(value instanceof Long)) {
-                setValueReflexion(instance, fieldName, Long.parseLong(value + ""), relacion, rf);
+                setValueReflexion(instance, fieldName, Long.parseLong(value + ""), relacion);
             } else {
 //                System.out.println(ex);
             }
@@ -599,7 +599,7 @@ public class JDBCManager {
      * @param value
      */
     private void setValueReflexion(Object instance, String fieldName, Object value) {
-        setValueReflexion(instance, fieldName, value, true, new ReflexionMethodAndField(instance));
+        setValueReflexion(instance, fieldName, value, true);
     }
 
     /**
@@ -624,27 +624,26 @@ public class JDBCManager {
     private <T> T setNewObject(Class object, ResultSet rs, boolean relacion) {
         try {
 
+            final Object ob = object.getConstructor().newInstance();
+
             List<Field> fil = getAllField(object);
-            
+
             for (Field field : fil) {
-                if(field.getAnnotation(Id.class) != null && field.getAnnotation(Column.class) != null){
-                    
+                if (field.getAnnotation(Id.class) != null && field.getAnnotation(Column.class) != null) {
+                    setValueReflexion(ob, field.getName(), rs.getObject(getNameInDB(field.getName())), relacion);
+                } else if (field.getAnnotation(ManyToOne.class) != null) {
+                    setValueReflexion(ob, field.getName() + "_id", rs.getObject(getNameInDB(field.getName() + "_id")), relacion);
                 }
             }
-            
+
             ResultSetMetaData mt = rs.getMetaData();
             if (mt.getColumnLabel(1).equalsIgnoreCase("count")) {
                 return (T) (rs.getObject(mt.getColumnLabel(1)));
             }
-            final Object ob = object.getConstructor().newInstance();
-            ReflexionMethodAndField rf = new ReflexionMethodAndField(ob);
-            for (int i = 0; i < mt.getColumnCount(); i++) {
-                setValueReflexion(ob, mt.getColumnLabel(i + 1), rs.getObject(mt.getColumnLabel(i + 1)), relacion, rf);
-            }
-            
-            
-            
 
+//            for (int i = 0; i < mt.getColumnCount(); i++) {
+//                setValueReflexion(ob, mt.getColumnLabel(i + 1), rs.getObject(mt.getColumnLabel(i + 1)), relacion);
+//            }
 //            if (relacion) {
 //                OneToMany(ob);
 //            }
@@ -683,7 +682,7 @@ public class JDBCManager {
                         {
                             put("id", getValueReflexion(Instance, getId(filas).getName()));
                         }
-                    }, -1), false, new ReflexionMethodAndField(((Class) reified[0])));
+                    }, -1), false);
                 }
 
             }
@@ -756,14 +755,17 @@ public class JDBCManager {
                 return m;
             }
         } catch (NoSuchMethodException | SecurityException ex) {
+        
         }
+//        System.out.println(name);
         Method[] methods = classObject.getMethods();
         for (Method method : methods) {
             if (method.getName().equalsIgnoreCase(name)) {
+                System.out.println("Metodo encontrado "+method.getName());
                 return method;
             }
         }
-//        System.out.println(name);
+
         return null;
     }
 
@@ -781,6 +783,7 @@ public class JDBCManager {
             }
         } catch (NoSuchFieldException | SecurityException ex) {
         }
+//        System.out.println(name);
         List<Field> methods = getAllField(classObject);
         for (Field method : methods) {
 //            System.out.println(method.getName() + " = "+name );
@@ -788,7 +791,7 @@ public class JDBCManager {
                 return method;
             }
         }
-//        System.out.println(name);
+
         return null;
     }
 
