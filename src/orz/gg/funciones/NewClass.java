@@ -5,11 +5,9 @@
  */
 package orz.gg.funciones;
 
-import com.megagroup.entidades.funcionales.Expediente;
+import com.megagroup.entidades.administracion.otros.Usuario;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Properties;
-import jpa.utilidades.JPAManager;
 
 /**
  *
@@ -21,10 +19,10 @@ public class NewClass {
 
 //        NewClass.class.getPackage().getClass().
         Properties p = new Properties();
-        p.put("url", "jdbc:mysql://localhost:3306/JDBCManager");
-        p.put("user", "root");
-        p.put("pass", "");
-        p.put("driver", "com.mysql.jdbc.Driver");
+        p.put("url", "jdbc:postgresql://192.168.123.236:5434/mProductos24");
+        p.put("user", "postgres");
+        p.put("pass", "Mega2014");
+        p.put("driver", "org.postgresql.Driver");
 //        Properties p = new Properties();
 //        p.put("url", "jdbc:postgresql://192.168.123.236:5434/mProductosNueva");
 //        p.put("user", "postgres");
@@ -34,17 +32,20 @@ public class NewClass {
         JDBCManager jDBCManager = new JDBCManager();
         JDBCManager.createConection(p);
 
+        Usuario us = jDBCManager.ejecutarQuery(Usuario.class, "SELECT * FROM Usuario ",null);
+        System.out.println(us);
+        
 //        List<Expediente> us = jDBCManager.ejecutarQuery(Expediente.class, "SELECT u.* FROM Expediente u WHERE u.nombre Like :nombre", new HashMap<String, Object>() {
 //            {
 //                put("nombre", "%%");
 //            }
 //        }, 1);
 
-        List<Cargo> us = jDBCManager.ejecutarQuery(Cargo.class, "SELECT u.* FROM CARGO u WHERE u.nombre Like :nombre", new HashMap<String, Object>() {
-            {
-                put("nombre", "%%");
-            }
-        }, -1);
+//        List<Cargo> us = jDBCManager.ejecutarQuery(Cargo.class, "SELECT u.* FROM CARGO u WHERE u.nombre Like :nombre", new HashMap<String, Object>() {
+//            {
+//                put("nombre", "%%");
+//            }
+//        }, -1);
         
 //         List<Cargo> us = new JPAManager().ejecutarQuery("SELECT u FROM Cargo u WHERE u.nombre Like :nombre", new HashMap<String, Object>() {
 //            {
@@ -85,15 +86,15 @@ public class NewClass {
 ////                }
 //            }
 //        }
-        if (us != null) {
-            for (Cargo u : us) {
-                System.out.println(u.getId());
-                System.out.println(u.getNombre());
-                System.out.println(u.getUsuarioU().size());
-//                for (UsuarioU u1 : u.getUsuarioU()) {
-//                    System.out.println(u1.getNombre());
-//                }
-            }
-        }
+//        if (us != null) {
+//            for (Cargo u : us) {
+//                System.out.println(u.getId());
+//                System.out.println(u.getNombre());
+//                System.out.println(u.getUsuarioU().size());
+////                for (UsuarioU u1 : u.getUsuarioU()) {
+////                    System.out.println(u1.getNombre());
+////                }
+//            }
+//        }
     }
 }

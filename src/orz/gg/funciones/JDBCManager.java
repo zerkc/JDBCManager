@@ -623,13 +623,11 @@ public class JDBCManager {
      */
     private <T> T setNewObject(Class object, ResultSet rs, boolean relacion) {
         try {
-
             final Object ob = object.getConstructor().newInstance();
 
             List<Field> fil = getAllField(object);
-
             for (Field field : fil) {
-                if (field.getAnnotation(Id.class) != null && field.getAnnotation(Column.class) != null) {
+                if (field.getAnnotation(Id.class) != null || field.getAnnotation(Column.class) != null) {
                     setValueReflexion(ob, field.getName(), rs.getObject(getNameInDB(field.getName())), relacion);
                 } else if (field.getAnnotation(ManyToOne.class) != null) {
                     setValueReflexion(ob, field.getName() + "_id", rs.getObject(getNameInDB(field.getName() + "_id")), relacion);
@@ -755,13 +753,13 @@ public class JDBCManager {
                 return m;
             }
         } catch (NoSuchMethodException | SecurityException ex) {
-        
+
         }
 //        System.out.println(name);
         Method[] methods = classObject.getMethods();
         for (Method method : methods) {
             if (method.getName().equalsIgnoreCase(name)) {
-                System.out.println("Metodo encontrado "+method.getName());
+//                System.out.println("Metodo encontrado "+method.getName());
                 return method;
             }
         }
@@ -806,23 +804,19 @@ public class JDBCManager {
         if (driverBD.toLowerCase().contains("mysql".toLowerCase())) {
             return query + String.format(" limit %d offset %d ", limit, offset);
         }
-
+        
         if (driverBD.toLowerCase().contains("postgresql".toLowerCase())) {
             return query + String.format(" limit %d offset %d", limit, offset);
         }
 
         if (driverBD.toLowerCase().contains("sqlserver".toLowerCase())) {
-            int initable = query.toUpperCase().indexOf("FROM");
-            int fintable = (!query.contains(" ")) ? query.length() : query.indexOf(" ");
-            String table = query.substring(initable, fintable);
-            return String.format("SELECT * FROM ("
-                    + "  SELECT %s.*,"
-                    + "    ROW_NUMBER() OVER (ORDER BY (select NULL as noorder)) AS RN"
-                    + "  FROM %s"
-                    + ") AS X"
-                    + "WHERE RN > %d"
-                    + "AND RN <= %d", table, table, offset, limit + offset);
+            String order = " ";
+            if (!query.toLowerCase().contains("order by")) {
+                order = " ORDER BY 1 DESC ";
+            }
+            return query + order + String.format(" OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", offset, limit);
         }
+        
         return "";
     }
 
