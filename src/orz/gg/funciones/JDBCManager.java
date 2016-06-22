@@ -5,10 +5,8 @@
  */
 package orz.gg.funciones;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -24,6 +22,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +33,7 @@ import javax.persistence.Column;
 import javax.persistence.Id;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
+import javax.persistence.OneToOne;
 
 /**
  *
@@ -138,11 +138,12 @@ public class JDBCManager {
         try {
             PreparedStatement pm = connection.prepareStatement(getQueryInsert(entity.getClass()), Statement.RETURN_GENERATED_KEYS);
             setValueQuery(pm, entity);
+            System.out.println(pm.toString());
             pm.executeUpdate();
             try (ResultSet generatedKeys = pm.getGeneratedKeys()) {
                 if (generatedKeys.next()) {
                     Field f = getId(getAllField(entity.getClass()));
-                    setValueReflexion(entity, f.getName(), generatedKeys.getLong(1));
+                    setValueReflexion(entity, f, generatedKeys.getLong(1));
                     return true;
                 } else {
                     throw new SQLException("Creating entity failed, no ID obtained.");
@@ -264,6 +265,10 @@ public class JDBCManager {
         return ejecutarQuery(classObject, query, condition, limit, 0);
     }
 
+    public <T> T ejecutarQuery(Class classObject, String query, Map condition, int limit, boolean relacion) {
+        return ejecutarQuery(classObject, query, condition, limit, 0, relacion);
+    }
+
     /**
      *
      * @param <T>
@@ -275,6 +280,10 @@ public class JDBCManager {
      * @return
      */
     public <T> T ejecutarQuery(Class classObject, String query, Map condition, int limit, int inicio) {
+        return ejecutarQuery(classObject, query, condition, limit, inicio, true);
+    }
+
+    public <T> T ejecutarQuery(Class classObject, String query, Map condition, int limit, int inicio, boolean relacion) {
         String DetecCondicion = query;
         List<String> condiciones = new ArrayList();
         List objs = new ArrayList();
@@ -301,7 +310,6 @@ public class JDBCManager {
         }
 
         try {
-
             PreparedStatement pm = connection.prepareStatement(getNameInDB(query));
             if (limit > 0) {
                 pm = connection.prepareStatement(limit(getNameInDB(query), limit, inicio));
@@ -312,7 +320,10 @@ public class JDBCManager {
 //            System.out.println(pm.toString());
             ResultSet rs = pm.executeQuery();
             while (rs.next()) {
-                objs.add(setNewObject(classObject, rs));
+                Object Ob = setNewObject(classObject, rs, relacion);
+                if (Ob != null) {
+                    objs.add(Ob);
+                }
             }
             return (T) objs;
         } catch (SQLException ex) {
@@ -411,6 +422,9 @@ public class JDBCManager {
                         Logger.getLogger(JDBCManager.class.getName()).log(Level.SEVERE, null, ex);
                     }
                     ps.setObject(c++, bos.toByteArray());
+                } else if (ob instanceof Date) {
+                    java.sql.Date dt = new java.sql.Date(((Date) ob).getTime());
+                    ps.setObject(c++, dt);
                 } else {
                     ps.setObject(c++, ob);
                 }
@@ -418,6 +432,7 @@ public class JDBCManager {
                 Object o = getValueReflexion(instance, field.getName());
                 if (o != null) {
                     Field f = getId(getAllField(o.getClass()));
+                    System.out.println(getValueReflexion(o, f.getName()));
                     ps.setObject(c++, getValueReflexion(o, f.getName()));
                 } else {
                     ps.setObject(c++, null);
@@ -476,7 +491,7 @@ public class JDBCManager {
      */
     private List<Field> getAllField(Class c, List f) {
         f.addAll(Arrays.asList(c.getDeclaredFields()));
-        if (c.getSuperclass() != null) {
+        if (!c.getSuperclass().getSimpleName().contains("Object")) {
             getAllField(c.getSuperclass(), f);
         }
         return f;
@@ -523,6 +538,7 @@ public class JDBCManager {
 //                System.out.println(method);
             }
             if (method == null) {
+
                 return null;
             }
 
@@ -541,50 +557,14 @@ public class JDBCManager {
      * @param relacion
      * @param rf
      */
-    private void setValueReflexion(Object instance, String fieldName, Object value, boolean relacion) {
+    private void setValueReflexion(Object instance, Field fieldName, Object value, boolean relacion) {
         try {
-            if (fieldName.toLowerCase().contains("_id") && (fieldName.toLowerCase().lastIndexOf("_id") == (fieldName.length() - 3)) && relacion) {
-//                System.out.println(fieldName.substring(0, fieldName.length() - 3));
-                Field f = getFieldClass(instance.getClass(), fieldName.substring(0, fieldName.length() - 3));
-                if (f != null) {
-                    f.setAccessible(true);
-                    Object o = get(f.getType(), value, false);
-                    if (o != null) {
-//                        System.out.println(capitalize(fieldName.substring(0, fieldName.length() - 3)));
-                        Method method = (getMethodClass1(instance.getClass(), "set" + capitalize(fieldName.substring(0, fieldName.length() - 3))));
-                        method.setAccessible(true);
-                        method.invoke(instance, get(o.getClass(), value, false));
-
-                    }
-                }
-            } else if (value != null && getMethodClass1(instance.getClass(), "set" + capitalize(fieldName)) != null) {
-                Field fila = getFieldClass(instance.getClass(), fieldName);
-                if (fila != null) {
-                    if (fila.getAnnotation(Column.class) != null || fila.getAnnotation(Id.class) != null) {
-                        Method method = (getMethodClass1(instance.getClass(), "set" + capitalize(fieldName)));
-
-                        if (Collection.class.isAssignableFrom(fila.getType())) {
-                            if (value instanceof byte[]) {
-                                try {
-                                    ObjectInputStream osi = new ObjectInputStream(new ByteArrayInputStream((byte[]) value));
-                                    method.invoke(instance, osi.readObject());
-                                } catch (IOException | ClassNotFoundException ex) {
-                                    Logger.getLogger(JDBCManager.class.getName()).log(Level.SEVERE, null, ex);
-                                }
-                            }
-                        } else if (method != null) {
-                            method.invoke(instance, value);
-                        }
-                    } else if (fila.getAnnotation(OneToMany.class) != null) {
-                        Method method = getMethodClass1(instance.getClass(), "set" + capitalize(fieldName));
-                        method.invoke(instance, value);
-
-                    }
-                }
-
+            if (value != null) {
+                fieldName.setAccessible(true);
+                fieldName.set(instance, value);
             }
-        } catch (SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
-            if (fieldName.equalsIgnoreCase("id") && !(value instanceof Long)) {
+        } catch (SecurityException | IllegalAccessException | IllegalArgumentException ex) {
+            if (fieldName.getName().equalsIgnoreCase("id") && !(value instanceof Long)) {
                 setValueReflexion(instance, fieldName, Long.parseLong(value + ""), relacion);
             } else {
 //                System.out.println(ex);
@@ -598,7 +578,7 @@ public class JDBCManager {
      * @param fieldName
      * @param value
      */
-    private void setValueReflexion(Object instance, String fieldName, Object value) {
+    private void setValueReflexion(Object instance, Field fieldName, Object value) {
         setValueReflexion(instance, fieldName, value, true);
     }
 
@@ -621,22 +601,56 @@ public class JDBCManager {
      * @param relacion
      * @return
      */
-    private <T> T setNewObject(Class object, ResultSet rs, boolean relacion) {
+    private <T> T setNewObject(Class object, final ResultSet rs, boolean relacion) {
         try {
-            final Object ob = object.getConstructor().newInstance();
 
-            List<Field> fil = getAllField(object);
-            for (Field field : fil) {
-                if (field.getAnnotation(Id.class) != null || field.getAnnotation(Column.class) != null) {
-                    setValueReflexion(ob, field.getName(), rs.getObject(getNameInDB(field.getName())), relacion);
-                } else if (field.getAnnotation(ManyToOne.class) != null) {
-                    setValueReflexion(ob, field.getName() + "_id", rs.getObject(getNameInDB(field.getName() + "_id")), relacion);
+            ResultSetMetaData mt = rs.getMetaData();
+            if (mt.getColumnCount() == 1) {
+
+                Object o = rs.getObject(mt.getColumnLabel(1));
+                if (o != null) {
+                    switch (object.getSimpleName()) {
+                        case "String":
+                        case "Integer":
+                        case "Boolean":
+                        case "Long":
+                        case "Double":
+                        case "Float":
+                            return (T) o;
+                    }
                 }
             }
 
-            ResultSetMetaData mt = rs.getMetaData();
-            if (mt.getColumnLabel(1).equalsIgnoreCase("count")) {
-                return (T) (rs.getObject(mt.getColumnLabel(1)));
+            final Object ob = object.getConstructor().newInstance();
+
+            List<Field> fil = getAllField(object);
+            for (final Field field : fil) {
+                try {
+                    if (field.getAnnotation(Id.class) != null || field.getAnnotation(Column.class) != null) {
+
+                        setValueReflexion(ob, field, rs.getObject(getNameInDB(field.getName())), relacion);
+                    } else if ((field.getAnnotation(ManyToOne.class) != null || field.getAnnotation(OneToOne.class) != null) && relacion) {
+                        boolean t = true;
+                        if (field.getAnnotation(OneToOne.class) != null) {
+                            OneToOne o = field.getAnnotation(OneToOne.class);
+                            if (!o.mappedBy().isEmpty()) {
+                                t = false;
+                            }
+                        }
+                        if (t) {
+                            try {
+                                field.setAccessible(true);
+                                Object o = get(field.getType(), rs.getObject(getNameInDB(field.getName() + "_id")), false);
+                                if (o != null) {
+                                    setValueReflexion(ob, field, o, false);
+                                }
+                            } catch (SQLException ex) {
+//                                Logger.getLogger(JDBCManager.class.getName()).log(Level.SEVERE, null, ex);
+                            }
+                        }
+                    }
+                } catch (Exception ex) {
+                }
             }
 
 //            for (int i = 0; i < mt.getColumnCount(); i++) {
@@ -676,7 +690,7 @@ public class JDBCManager {
                 if (!(genericSuper instanceof Class)) {
                     ParameterizedType generic = (ParameterizedType) genericSuper;
                     java.lang.reflect.Type[] reified = generic.getActualTypeArguments();
-                    setValueReflexion(Instance, fila.getName(), ejecutarQuery(((Class) reified[0]), "SELECT * FROM " + getNameInDB(((Class) reified[0]).getSimpleName()) + " WHERE " + getNameInDB(getNameClassRelation(((Class) reified[0]), Instance.getClass())) + "=:id", new HashMap() {
+                    setValueReflexion(Instance, fila, ejecutarQuery(((Class) reified[0]), "SELECT * FROM " + getNameInDB(((Class) reified[0]).getSimpleName()) + " WHERE " + getNameInDB(getNameClassRelation(((Class) reified[0]), Instance.getClass())) + "=:id", new HashMap() {
                         {
                             put("id", getValueReflexion(Instance, getId(filas).getName()));
                         }
@@ -745,10 +759,10 @@ public class JDBCManager {
      * @param name
      * @return
      */
-    private Method getMethodClass1(Class classObject, String name) {
+    private Method getMethodClass1(Class classObject, String name, Class... c) {
 
         try {
-            Method m = classObject.getMethod(name);
+            Method m = classObject.getMethod(name, c);
             if (m != null) {
                 return m;
             }
@@ -781,7 +795,7 @@ public class JDBCManager {
             }
         } catch (NoSuchFieldException | SecurityException ex) {
         }
-//        System.out.println(name);
+        System.out.println(name);
         List<Field> methods = getAllField(classObject);
         for (Field method : methods) {
 //            System.out.println(method.getName() + " = "+name );
@@ -804,7 +818,7 @@ public class JDBCManager {
         if (driverBD.toLowerCase().contains("mysql".toLowerCase())) {
             return query + String.format(" limit %d offset %d ", limit, offset);
         }
-        
+
         if (driverBD.toLowerCase().contains("postgresql".toLowerCase())) {
             return query + String.format(" limit %d offset %d", limit, offset);
         }
@@ -816,7 +830,7 @@ public class JDBCManager {
             }
             return query + order + String.format(" OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", offset, limit);
         }
-        
+
         return "";
     }
 

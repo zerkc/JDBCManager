@@ -5,8 +5,11 @@
  */
 package orz.gg.funciones;
 
-import com.megagroup.entidades.administracion.otros.Usuario;
-import java.util.HashMap;
+import com.megagroup.entidades.administracion.funcionales.TipoExpediente;
+import com.megagroup.entidades.almacenamiento.UnidadAlmacenamientoNivel3;
+import com.megagroup.entidades.funcionales.Expediente;
+import java.util.Date;
+import java.util.List;
 import java.util.Properties;
 
 /**
@@ -32,26 +35,25 @@ public class NewClass {
         JDBCManager jDBCManager = new JDBCManager();
         JDBCManager.createConection(p);
 
-        Usuario us = jDBCManager.ejecutarQuery(Usuario.class, "SELECT * FROM Usuario ",null);
-        System.out.println(us);
+//        Usuario us = jDBCManager.ejecutarQuery(Usuario.class, "SELECT * FROM Usuario ",null);
+//        System.out.println(us);
         
-//        List<Expediente> us = jDBCManager.ejecutarQuery(Expediente.class, "SELECT u.* FROM Expediente u WHERE u.nombre Like :nombre", new HashMap<String, Object>() {
-//            {
-//                put("nombre", "%%");
-//            }
-//        }, 1);
-
+        List<Expediente> us = jDBCManager.ejecutarQuery(Expediente.class, "SELECT * FROM Expediente ", null, -1);
+        
+        
+        for (Expediente u : us) {
+            if(u.getUnidadAlmacenamiento3() != null){
+                System.out.println(u.getUnidadAlmacenamiento3().getUnidadAlmacenamiento2());
+            }
+            
+        }
 //        List<Cargo> us = jDBCManager.ejecutarQuery(Cargo.class, "SELECT u.* FROM CARGO u WHERE u.nombre Like :nombre", new HashMap<String, Object>() {
 //            {
 //                put("nombre", "%%");
 //            }
 //        }, -1);
         
-//         List<Cargo> us = new JPAManager().ejecutarQuery("SELECT u FROM Cargo u WHERE u.nombre Like :nombre", new HashMap<String, Object>() {
-//            {
-//                put("nombre", "%%");
-//            }
-//        }, -1);
+//         List<UnidadAlmacenamientoNivel1> us = jDBCManager.ejecutarQuery(UnidadAlmacenamientoNivel1.class,"SELECT * FROM UnidadAlmacenamientoNivel1 ",null, -1);
 //        Usuario usuario = new Usuario();
 //        usuario.setId(1L);
 //        usuario.setNombre("GustavoG");
@@ -65,15 +67,18 @@ public class NewClass {
 //        usuario = jDBCManager.get(Usuario.class, 1L);
 //        System.out.println(usuario);
 //
-//        for (int i = 8000; i < 16000; i++) {
+//        for (long i = 9003; i < 9004; i++) {
 //
-//            Cargo c = new Cargo();
-//            c.setId(6L);
-//            UsuarioU usuario = new UsuarioU();
-//            usuario.setNombre(i+"");
-//            usuario.setPassword(i+"");
-//            usuario.setCargo(c);
-//            jDBCManager.persist(usuario);
+//            Expediente ua1 = new Expediente();
+//            ua1.setId(i);
+//            ua1.setNombre(i+"");
+//            ua1.setEstado("Archivado");
+//            ua1.setFechaCreacion(new Date());
+//            UnidadAlmacenamientoNivel3 c = jDBCManager.get(UnidadAlmacenamientoNivel3.class, 106L);
+//            TipoExpediente tp = jDBCManager.get(TipoExpediente.class, 1L);
+//            ua1.setTipoExpediente(tp);
+//            ua1.setUnidadAlmacenamiento3(c);
+//            jDBCManager.persist(ua1);
 //        }
 
 //        if (us != null) {
